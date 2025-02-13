@@ -24,8 +24,10 @@ int lookup_and_connect( const char *host, const char *service );
 int main( int argc, char *argv[] ) {
 	char *host;
 	char buf[MAX_LINE];
+	char *msg = "GET /~kkredo/file.html HTTP/1.0\r\n\r\n";
 	int s;
 	int len;
+	int strLen = strlen(msg);
 
 	if ( argc == 2 ) {
 		host = argv[1];
@@ -40,6 +42,8 @@ int main( int argc, char *argv[] ) {
 		exit( 1 );
 	}
 
+
+	//send(s, msg, strLen, 0);
 	/* Main loop: get and send lines of text */
 	while ( fgets( buf, sizeof( buf ), stdin ) ) {
 		buf[MAX_LINE - 1] = '\0';
@@ -63,7 +67,7 @@ int lookup_and_connect( const char *host, const char *service ) {
 
 	/* Translate host name into peer's IP address */
 	memset( &hints, 0, sizeof( hints ) );
-	hints.ai_family = AF_INET;
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = 0;
 	hints.ai_protocol = 0;
