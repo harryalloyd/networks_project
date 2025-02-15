@@ -9,7 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define SERVER_PORT "5432"
+// #define SERVER_PORT "5432" --> will likely get rid of this because I declared port in main
 #define MAX_LINE 256
 
 /*
@@ -22,11 +22,22 @@
 int lookup_and_connect( const char *host, const char *service );
 
 int main( int argc, char *argv[] ) {
-	char *host;
-	char buf[MAX_LINE];
+	const char *http_request = "GET /~kkredo/file.html HTTP/1.0\r\n\r\n";
+    const char *host = "www.ecst.csuchico.com";
+    const char *port = "80";
+
+	int chunk_size;
+	int h1_tags_count = 0;
+	int total_bytes = 0;
 	int s;
+
+	// not positive how these will be used yet. Might get rid of it 
+	char buf[MAX_LINE];
 	int len;
 
+	// Here we're checking to make sure there are the correct # of command-line arguments
+	// The program is expecting two arguments, the first being the name of the program, i.e.
+	// ./counter-h1 and the second argument being the chunk size, i.e. 650
 	if ( argc == 2 ) {
 		host = argv[1];
 	}
@@ -36,23 +47,29 @@ int main( int argc, char *argv[] ) {
 	}
 
 	/* Lookup IP and connect to server */
-	if ( ( s = lookup_and_connect( host, SERVER_PORT ) ) < 0 ) {
+	if ( ( s = lookup_and_connect( host, port ) ) < 0 ) {
 		exit( 1 );
 	}
 
-	/* Main loop: get and send lines of text */
-	while ( fgets( buf, sizeof( buf ), stdin ) ) {
-		buf[MAX_LINE - 1] = '\0';
-		len = strlen( buf ) + 1;
-		if ( send( s, buf, len, 0 ) == -1 ) {
-			perror( "stream-talk-client: send" );
-			close( s );
-			exit( 1 );
-		}
+	// We need to grab the size of the chunk_size that the user enters
+	chunk_size = atoi( argv[1] );
+
+	// Checking to make sure the user enter a valid chunk size between 1 and 1000
+	if ( chunk_size > 1000 || chunk_size < 1) {
+		fprintf(stderr, "You entered the chunk size %d make sure its between 1-1000\n", chunk_size);
+		exit ( 1 );
 	}
 
-	close( s );
+	
+	while (1) {
+		//this is where we'll extract the data
+	}
 
+	// After the while loop grabs all the data we'll print below
+	printf("Number of <h1> tags: %d\n", h1_tags_count);
+	printf("Number of bytes: %d\n", total_bytes);
+
+	close( s );
 	return 0;
 }
 
