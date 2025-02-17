@@ -20,7 +20,7 @@
  * the returned socket.
  */
 int lookup_and_connect( const char *host, const char *service );
-int sendall(int s, char *buf, int *len);
+int sendAll(int s, char *buf, int *len);
 int recvAll(int s, char *buf, int *len);
 
 
@@ -83,9 +83,9 @@ int main( int argc, char *argv[] ) {
         len = sizeof(buf) - total_received;
         int bytes_received = recvAll(s, buf + total_received, len);
         if(bytes_received < 0){
-        perror("recv failed");
-        close (s);
-        return -1
+            perror("recv failed");
+            close (s);
+            return -1
         }
         if(bytes_received ==0) {
             break;
