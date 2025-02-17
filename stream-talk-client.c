@@ -34,6 +34,7 @@ int main( int argc, char *argv[] ) {
 	int total_bytes = 0;
 	int s;
     char* position=0;
+    int total_received =0;
 
 	// not positive how these will be used yet. Might get rid of it 
 	char buf[MAX_LINE];
@@ -79,16 +80,17 @@ int main( int argc, char *argv[] ) {
 	while (1) {                   // Think of partial recieves and don't forget to check for an error and close socket
         //this is where we'll extract the data                  While recieving data strstr() search for "<H1>" up til chunk size defined by command line. then increment counter and position pointer by 4
 
-        /* if(revAll(s, buf + total_recieved, chunk_size) < 0){
+        len = sizeof(buf) - total_received;
+        int bytes_received = recvAll(s, buf + total_received, len);
+        if(bytes_received < 0){
         perror("recv failed");
         close (s);
         return -1
         }
-         
-*/
-
-
-
+        if(bytes_received ==0) {
+            break;
+        }
+        total_received += bytes_received;
     }
 
 	// After the while loop grabs all the data we'll print below
