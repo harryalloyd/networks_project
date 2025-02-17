@@ -40,11 +40,13 @@ int main( int argc, char *argv[] ) {
 
 	
 	if (argc != 2) { // we're checking to make sure we get the correct amount of arguments
+		perror("Incorrect number of arguments given");
         exit(1);
     }
 
 	/* Lookup IP and connect to server */
 	if ( ( s = lookup_and_connect( host, port ) ) < 0 ) {
+		perror("Failed to connect");
 		exit( 1 );
 	}
 
@@ -53,6 +55,7 @@ int main( int argc, char *argv[] ) {
 
 	// Checking to make sure the user enter a valid chunk size between 1 and 1000
 	if ( chunk_size > 1000 || chunk_size < 1) {
+		perror("chucnk size must be between 1 and 1000");
 		exit ( 1 );
 	}
 
@@ -61,14 +64,14 @@ int main( int argc, char *argv[] ) {
 
 
     if (send_data_to_soc(s, http_request, &len) < 0) {
-        perror("sendAll failed");
+        perror("send_data_to_soc failed");
         close(s);
         return -1;
     }
 
 	bufs = malloc(chunk_size + 1); // +1 to account for the null terminator
     if (!bufs) {
-        perror("malloc");
+		perror("Memory allocation for bufs failed");
         close(s);
         return -1;
     }
@@ -146,7 +149,7 @@ int lookup_and_connect( const char *host, const char *service ) {
 
 	/* Translate host name into peer's IP address */
 	memset( &hints, 0, sizeof( hints ) );
-	hints.ai_family = AF_INET;
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = 0;
 	hints.ai_protocol = 0;
