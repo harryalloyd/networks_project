@@ -13,10 +13,12 @@ int lookup_and_connect( const char *host, const char *service );
 int send_data_to_soc( int s, const char *buf, int *len );
 int recv_data_from_soc( int s, char *buf, int *len );
 
+
 int main( int argc, char *argv[] ) {
     const unsigned char join_bytes = 0x00; 
     const unsigned char pub_bytes = 0x01; 
     const unsigned char search_bytes = 0x02; 
+    //const unsigned char fetch_bytes = 0x03;
 
     // Check that we received exactly three arguments
     if ( argc != 4 ) {
@@ -198,11 +200,45 @@ int main( int argc, char *argv[] ) {
         else if ( strcmp( user_input, "FETCH" )==0 ) { 
             printf("Enter file: ");
             char user_file[100];
+            //char name_of_file[256];
             if (fgets(user_file, sizeof(user_file), stdin) == NULL) {
                 continue;
             }
             user_file[strcspn( user_file, "\n" )] = '\0';
 
+            //Send search request:
+            //call search using user_file (copy search logic here or define a new funtion to call)
+
+            //connect to peer using lookup and host:
+            //int peer_id = lookup_and_connect(peer_ID_of_res, respPort)
+            //if ( sock_dir<0 ) {
+            //     fprintf( stderr,"Error: could not connect to registry.\n" );
+            //     exit( 1 );
+            // }
+
+            //fetch request:
+            // int name_of_file_length = strlen( name_of_file ) + 1;
+            // int request_length = 1 + name_of_file_length; // Total length of the search packet
+            // unsigned char *fetch_packet = malloc( request_length ); // allocating memory for the fetch packet.
+            // if ( fetch_packet == NULL ) {
+            //     perror( "malloc" );
+            //     continue;
+            // }
+
+            //copy file into packet
+            // fetch_packet[0] = fetch_bytes; // Set the first byte to search action
+            // memcpy( search_packet+1, name_of_file, name_of_file_length ); //copy the file into the packet
+
+            // if ( fgets( name_of_file, sizeof( name_of_file ), stdin )==NULL ) { // If no input is received
+            //     continue;
+            // }
+
+            //send to peer:
+
+            //recieve packet:
+
+            //open, read, and save data:
+            
         }
 
     }
