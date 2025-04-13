@@ -195,15 +195,67 @@ int main( int argc, char *argv[] ) {
                 printf( "File found at\nPeer %u\n%s:%u\n",peer_ID_of_res,ipStr,respPort );
             }
         }
-        else if ( strcmp( user_input, "FETCH" )==0 ) { 
-            printf("Enter file: ");
-            char user_file[100];
-            if (fgets(user_file, sizeof(user_file), stdin) == NULL) {
+
+
+        else if ( strcmp( user_input,"FETCH" ) ==0 ) {
+            printf( "Enter a file: " );
+            char user_file[100]; //buffer storing the user filename
+
+            // If fgets returns NULL, it means there's no input or an error occurred,
+            if ( !fgets( user_file, sizeof( user_file ), stdin )) { 
                 continue;
             }
             user_file[strcspn( user_file, "\n" )] = '\0';
+            unsigned char search_req[101]; // Building search request to send to registry:
+            search_req[0] = 0x02; 
+            int file_len = strlen( user_file ) +1; //gets the length of the filename, including its null terminator
+            memcpy( search_req+1,user_file,file_len ); // Copy the filename into search request
+        
+            int s_len = 1 + file_len;
+            // Send search request to the registry
+            if ( send_data_to_soc( sock_dir, ( char* )search_req,&s_len ) ==-1 ) {
+                perror("send SEARCH");
+                continue;
+            }
+        
+            char resp[10];
+            int r_len = 10;
+            //either fewer than 10 bytes read or there's an error
+            if ( recv_data_from_soc( sock_dir,resp,&r_len ) ==-1 || r_len<10 ) {
+                fprintf( stderr, "SEARCH response error\n" );
+                continue;
+            }
+        
+            uint32_t peer_id; 
+            memcpy( &peer_id, resp, 4 );
+            //This extracts the peer ID
+            peer_id = ntohl( peer_id );
+        
+            struct in_addr addr;
+            //This extracts the IP address
+            memcpy( &addr,resp+4,4 );
+        
+            uint16_t port;
+            memcpy( &port,resp+8,2 );
+            //This extracts the port
+            port = ntohs( port );
+        
+            // If the peer_id, address, + port are all 0, the registry didn't find any peer with this file.
+            if ( !peer_id && !addr.s_addr && !port ) {
+                printf( "File not indexed by registry.\n" );
+                continue;
+            }
+        
 
+
+
+            
+        
+            
+            
         }
+        
+        
 
     }
 
