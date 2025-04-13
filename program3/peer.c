@@ -245,27 +245,55 @@ int main( int argc, char *argv[] ) {
                 printf( "File not indexed by registry.\n" );
                 continue;
             }
+
+            // Converts the binary into text
+            char ip_str[INET_ADDRSTRLEN];
+            if ( !inet_ntop( AF_INET,&addr,ip_str,sizeof( ip_str ))) {
+                perror( "inet_ntop" );
+                continue;
+            }
+
+            // Converts the port into a string
+            char port_str[16];
+            snprintf( port_str,sizeof( port_str ),"%u",port );
+        
+            // connects to peer 
+            int peer_sock = lookup_and_connect( ip_str, port_str );
+            if ( peer_sock<0 ) {
+                fprintf( stderr, "Could not connect to peer" );
+                continue;
+            }
+
+            // this builds the fetch request
+            unsigned char fetch_req[101];
+            fetch_req[0] = 0x03; // Set first byte to 0x03, this indicate a fetch
+            memcpy( fetch_req+1, user_file,file_len );
+            int f_len =1+file_len;
+
+            // Send the FETCH request to the connected peer 
+            if ( send_data_to_soc( peer_sock, ( char* )fetch_req, &f_len ) ==-1 ) {
+                perror( "send FETCH" );
+                close( peer_sock );
+                continue;
+            }
+
+            /*
+            Whats left to do:
+            Receive a single-byte status code from the peer.
+            Check the status code and handle any error before continuing.
+            Open the file for writing in binary mode.
+            Continuously read chunks of data from the peer and write them to the file.
+            Close the file and connection, then display a confirmation message with peer details.
+            */
         
 
-
-
-            
-        
-            
-            
         }
         
         
-
     }
 
     return 0;
 }
-
-
-
-
-
 
 
 
