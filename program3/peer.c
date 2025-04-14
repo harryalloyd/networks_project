@@ -278,14 +278,48 @@ int main( int argc, char *argv[] ) {
             }
 
             /*
-            Whats left to do:
+            
             Receive a single-byte status code from the peer.
             Check the status code and handle any error before continuing.
-            Open the file for writing in binary mode.
-            Continuously read chunks of data from the peer and write them to the file.
-            Close the file and connection, then display a confirmation message with peer details.
             */
-        
+            char statusCode[1];
+            int s_len =1;
+            if( recv_data_from_soc(peer_sock, statusCode, &s_len) != 0 || s_len != 1){
+                fprintf(stderr, "Could not recieve data or status code is too large");
+                close(peer_sock);
+                continue;
+            }
+            if(statusCode[0] != 0x01){
+                fprintf(stderr, "Status code error");
+                close(peer_sock);
+                continue;
+            }
+
+            
+            
+            //Open the file for writing in binary mode.
+
+            FILE *newFile = fopen ("requested_file.bin", "wb");
+            if(!newFile){
+                perror("Could not open file");
+                close(peer_sock);
+                return -1;
+            }
+
+            //Continuously read chunks of data from the peer and write them to the file.
+            char writeBuf[4096]; 
+            int bytes_remaining;
+            while((bytes_remaining = recv(peer_sock, writeBuf, sizeof(writeBuf), 0)) >0){
+                fwrite(writeBuf, 1, bytes_remaining, newFile);
+            }
+            if(bytes_remaining < 0){
+                perror("Could not recieve properly");
+            }
+            fclose(newFile); //Close the file and connection.
+            close(peer_sock);
+            
+            //Whats left to do:
+            //Display a confirmation message with peer details.
 
         }
         
@@ -294,9 +328,6 @@ int main( int argc, char *argv[] ) {
 
     return 0;
 }
-
-
-
 
 
 
