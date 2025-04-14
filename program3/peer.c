@@ -278,6 +278,7 @@
                 continue;
             }
 
+<<<<<<< HEAD
             unsigned char code;
             int c_len = 1;
 
@@ -312,6 +313,51 @@
             
             
             
+=======
+            /*
+            
+            Receive a single-byte status code from the peer.
+            Check the status code and handle any error before continuing.
+            */
+            char statusCode[1];
+            int s_len =1;
+            if( recv_data_from_soc(peer_sock, statusCode, &s_len) != 0 || s_len != 1){
+                fprintf(stderr, "Could not recieve data or status code is too large");
+                close(peer_sock);
+                continue;
+            }
+            if(statusCode[0] != 0x01){
+                fprintf(stderr, "Status code error");
+                close(peer_sock);
+                continue;
+            }
+
+            
+            
+            //Open the file for writing in binary mode.
+
+            FILE *newFile = fopen ("requested_file.bin", "wb");
+            if(!newFile){
+                perror("Could not open file");
+                close(peer_sock);
+                return -1;
+            }
+
+            //Continuously read chunks of data from the peer and write them to the file.
+            char writeBuf[4096]; 
+            int bytes_remaining;
+            while((bytes_remaining = recv(peer_sock, writeBuf, sizeof(writeBuf), 0)) >0){
+                fwrite(writeBuf, 1, bytes_remaining, newFile);
+            }
+            if(bytes_remaining < 0){
+                perror("Could not recieve properly");
+            }
+            fclose(newFile); //Close the file and connection.
+            close(peer_sock);
+            
+            //Whats left to do:
+            //Display a confirmation message with peer details.
+>>>>>>> 3ce30c66ef24abca1e2c91c516f54353cb2f2e49
 
         }
 
@@ -321,6 +367,7 @@
 
     return 0;
 }
+<<<<<<< HEAD
  
  
  
@@ -402,3 +449,78 @@
          return 0;
      }
  }
+=======
+
+
+
+int lookup_and_connect( const char *host, const char *service ) {
+	struct addrinfo hints;
+	struct addrinfo *rp, *result;
+	int s;
+	memset( &hints, 0, sizeof( hints ) );
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;
+	if ( ( s = getaddrinfo( host, service, &hints, &result ) ) != 0 ) {
+		fprintf( stderr, "stream-talk-client: getaddrinfo: %s\n", gai_strerror( s ) );
+		return -1;
+	}
+	for ( rp = result; rp != NULL; rp = rp->ai_next ) {
+		if ( ( s = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol ) ) == -1 ) {
+			continue;
+		}
+		if ( connect( s, rp->ai_addr, rp->ai_addrlen ) != -1 ) {
+			break;
+		}
+		close( s );
+	}
+	if ( rp == NULL ) {
+		perror( "stream-talk-client: connect" );
+		return -1;
+	}
+	freeaddrinfo( result );
+
+	return s;
+}
+
+// function used in last program
+int send_data_to_soc(int s, const char *buf, int *len) {
+    int tot = 0;
+    int bytes_left = *len;
+    int num;
+    while (tot < *len) {
+        num = send(s, buf + tot, bytes_left, 0);
+        if (num == -1)
+            break;
+        tot += num;
+        bytes_left -= num;
+    }
+    *len = tot;
+    if (num == -1) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+
+// function used in last program
+int recv_data_from_soc(int s, char *buf, int *len) {
+    int tot = 0;
+    int bytes_left = *len;
+    int num;
+    while (tot < *len) {
+        num = recv(s, buf + tot, bytes_left, 0);
+        if (num <= 0)
+            break;
+		tot += num;
+        bytes_left -= num;
+    }
+    *len = tot;
+    if (num < 0) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
+>>>>>>> 3ce30c66ef24abca1e2c91c516f54353cb2f2e49
