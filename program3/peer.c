@@ -222,7 +222,7 @@
             char resp[10];
             int r_len = 10;
             //either fewer than 10 bytes read or there's an error
-            if ( recv_data_from_soc( sock_dir,resp,&r_len ) ==-1 || r_len<10 ) {
+            if ( recv_data_from_soc( sock_dir,resp,&r_len ) ==-1||r_len<10 ) {
                 fprintf( stderr, "SEARCH response error\n" );
                 continue;
             }
@@ -255,24 +255,24 @@
             }
 
             // Converts the port into a string
-            char port_str[16];
-            snprintf( port_str,sizeof( port_str ),"%u",port );
+            char port_strs[16];
+            snprintf( port_strs,sizeof( port_strs ),"%u",port );
 
             // connects to peer 
-            int peer = lookup_and_connect( ip_str, port_str );
-            if ( peer<0 ) {
+            int peer =lookup_and_connect( ip_str, port_strs );
+            if ( peer<0 ){
                 fprintf( stderr, "Could not connect to peer" );
                 continue;
             }
 
             // this builds the fetch request
-            unsigned char fetch_req[101];
-            fetch_req[0] = 0x03; // Set first byte to 0x03, this indicate a fetch
-            memcpy( fetch_req+1, user_file,file_len );
+            unsigned char fetch_reqst[101];
+            fetch_reqst[0] =0x03; // Set first byte to 0x03, this indicate a fetch
+            memcpy( fetch_reqst+1,user_file,file_len );
             int f_len =1+file_len;
 
             // Send the FETCH request to the connected peer 
-            if ( send_data_to_soc( peer, ( char* )fetch_req, &f_len ) ==-1 ) {
+            if ( send_data_to_soc( peer, ( char* )fetch_reqst,&f_len ) ==-1 ) {
                 perror( "send the fetch out" );
                 close( peer );
                 continue;
@@ -282,7 +282,7 @@
             int c_len = 1;
 
             // Receive the response code from the peer; if there's an error or we got 0 bytes, report it
-            if ( recv_data_from_soc( peer,( char* )&code, &c_len )==-1 ||c_len<1 ) {
+            if ( recv_data_from_soc( peer,( char* )&code,&c_len )==-1||c_len<1 ) {
                 fprintf( stderr, "fetch response error\n" );
                 close( peer );
                 continue;
@@ -298,9 +298,9 @@
             char buffer_for_peer[512];
             // This doesn't stop reading the data from socket till there's none left
             while ( true ) {
-                int bytes_expected = sizeof(buffer_for_peer);
+                int bytes_expected = sizeof( buffer_for_peer );
                 //if there's no more data or a weird error happens then break out
-                if (recv_data_from_soc( peer,buffer_for_peer,&bytes_expected) ==-1 || bytes_expected ==0 )
+                if (recv_data_from_soc( peer,buffer_for_peer,&bytes_expected ) ==-1 || bytes_expected ==0 )
                     break;
                 fwrite( buffer_for_peer,1,bytes_expected,file_point ); // Whatever bytes we're successful, write it to the file
             }
@@ -331,7 +331,7 @@
  
  
  
- 
+ //code given
  int lookup_and_connect( const char *host, const char *service ) {
  	struct addrinfo hints;
  	struct addrinfo *rp, *result;
