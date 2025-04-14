@@ -1,29 +1,30 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <string.h>
-#include <unistd.h>
-#include <dirent.h>
-#include <arpa/inet.h>
-#include <stdint.h>  
-
-int lookup_and_connect( const char *host, const char *service );
-int send_data_to_soc( int s, const char *buf, int *len );
-int recv_data_from_soc( int s, char *buf, int *len );
-
-int main( int argc, char *argv[] ) {
+ #include <stdlib.h>
+ #include <sys/types.h>
+ #include <sys/socket.h>
+ #include <netdb.h>
+ #include <string.h>
+ #include <unistd.h>
+ #include <dirent.h>
+ #include <arpa/inet.h>
+ #include <stdint.h>  
+ #include <stdbool.h>
+ 
+ int lookup_and_connect( const char *host, const char *service );
+ int send_data_to_soc( int s, const char *buf, int *len );
+ int recv_data_from_soc( int s, char *buf, int *len );
+ 
+ int main( int argc, char *argv[] ) {
     const unsigned char join_bytes = 0x00; 
     const unsigned char pub_bytes = 0x01; 
     const unsigned char search_bytes = 0x02; 
-
+ 
     // Check that we received exactly three arguments
     if ( argc != 4 ) {
         fprintf( stderr, "Invalid arguments provided\n" );
         exit( 1 );
     }
-
+ 
     const char *reg_host=argv[1]; //Registry host 
     const char *reg_port=argv[2]; //Registry port number
     int peer_id=atoi( argv[3] ); //Peer ID (string converted to int because command line argument is text and we need int)
@@ -63,11 +64,11 @@ int main( int argc, char *argv[] ) {
             // Builds the join packet
             char joinRequest[5];  
             joinRequest[0]=join_bytes;  // Set the byte (0x00 for join)
-        
+
             // Convert the peer_id (int) to network byte order and copy it into the packet
             uint32_t peer_ID_net=htonl(( uint32_t )peer_id );
             memcpy( joinRequest+1,&peer_ID_net,sizeof( peer_ID_net ));
-        
+
             // Prepare to send the 5-byte JOIN packet in one go
             int joinLength = 5;
             if ( send_data_to_soc( sock_dir,joinRequest,&joinLength )==-1 ) {
@@ -210,14 +211,14 @@ int main( int argc, char *argv[] ) {
             search_req[0] = 0x02; 
             int file_len = strlen( user_file ) +1; //gets the length of the filename, including its null terminator
             memcpy( search_req+1,user_file,file_len ); // Copy the filename into search request
-        
+
             int s_len = 1 + file_len;
             // Send search request to the registry
             if ( send_data_to_soc( sock_dir, ( char* )search_req,&s_len ) ==-1 ) {
                 perror("send SEARCH");
                 continue;
             }
-        
+
             char resp[10];
             int r_len = 10;
             //either fewer than 10 bytes read or there's an error
@@ -225,21 +226,21 @@ int main( int argc, char *argv[] ) {
                 fprintf( stderr, "SEARCH response error\n" );
                 continue;
             }
-        
+
             uint32_t peer_id; 
             memcpy( &peer_id, resp, 4 );
             //This extracts the peer ID
             peer_id = ntohl( peer_id );
-        
+
             struct in_addr addr;
             //This extracts the IP address
             memcpy( &addr,resp+4,4 );
-        
+
             uint16_t port;
             memcpy( &port,resp+8,2 );
             //This extracts the port
             port = ntohs( port );
-        
+
             // If the peer_id, address, + port are all 0, the registry didn't find any peer with this file.
             if ( !peer_id && !addr.s_addr && !port ) {
                 printf( "File not indexed by registry.\n" );
@@ -256,10 +257,10 @@ int main( int argc, char *argv[] ) {
             // Converts the port into a string
             char port_str[16];
             snprintf( port_str,sizeof( port_str ),"%u",port );
-        
+
             // connects to peer 
-            int peer_sock = lookup_and_connect( ip_str, port_str );
-            if ( peer_sock<0 ) {
+            int peer = lookup_and_connect( ip_str, port_str );
+            if ( peer<0 ) {
                 fprintf( stderr, "Could not connect to peer" );
                 continue;
             }
@@ -271,102 +272,133 @@ int main( int argc, char *argv[] ) {
             int f_len =1+file_len;
 
             // Send the FETCH request to the connected peer 
-            if ( send_data_to_soc( peer_sock, ( char* )fetch_req, &f_len ) ==-1 ) {
-                perror( "send FETCH" );
-                close( peer_sock );
+            if ( send_data_to_soc( peer, ( char* )fetch_req, &f_len ) ==-1 ) {
+                perror( "send the fetch out" );
+                close( peer );
                 continue;
             }
 
-            /*
-            Whats left to do:
-            Receive a single-byte status code from the peer.
-            Check the status code and handle any error before continuing.
-            Open the file for writing in binary mode.
-            Continuously read chunks of data from the peer and write them to the file.
-            Close the file and connection, then display a confirmation message with peer details.
-            */
+            unsigned char code;
+            int c_len = 1;
+
+            // Receive the response code from the peer; if there's an error or we got 0 bytes, report it
+            if ( recv_data_from_soc( peer,( char* )&code, &c_len )==-1 ||c_len<1 ) {
+                fprintf( stderr, "fetch response error\n" );
+                close( peer );
+                continue;
+            }
+            FILE *file_point = fopen( user_file,"wb" ); //opens the file
+
+            if ( file_point==NULL ) {
+                perror( "fopen" ); //if it fails
+                close( peer );
+                continue;
+            }
         
+            char buffer_for_peer[512];
+            // This doesn't stop reading the data from socket till there's none left
+            while ( true ) {
+                int bytes_expected = sizeof(buffer_for_peer);
+                //if there's no more data or a weird error happens then break out
+                if (recv_data_from_soc( peer,buffer_for_peer,&bytes_expected) ==-1 || bytes_expected ==0 )
+                    break;
+                fwrite( buffer_for_peer,1,bytes_expected,file_point ); // Whatever bytes we're successful, write it to the file
+            }
+        
+            fclose( file_point );
+            close( peer );
+            printf("File found at Peer %u %s:%u. file saved \"%s\".\n",peer_id, ip_str, port, user_file );
+
+            
+            
+            
 
         }
-        
-        
+
+
+
     }
 
     return 0;
 }
-
-
-
-
-
-
-int lookup_and_connect( const char *host, const char *service ) {
-	struct addrinfo hints;
-	struct addrinfo *rp, *result;
-	int s;
-	memset( &hints, 0, sizeof( hints ) );
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = 0;
-	hints.ai_protocol = 0;
-	if ( ( s = getaddrinfo( host, service, &hints, &result ) ) != 0 ) {
-		fprintf( stderr, "stream-talk-client: getaddrinfo: %s\n", gai_strerror( s ) );
-		return -1;
-	}
-	for ( rp = result; rp != NULL; rp = rp->ai_next ) {
-		if ( ( s = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol ) ) == -1 ) {
-			continue;
-		}
-		if ( connect( s, rp->ai_addr, rp->ai_addrlen ) != -1 ) {
-			break;
-		}
-		close( s );
-	}
-	if ( rp == NULL ) {
-		perror( "stream-talk-client: connect" );
-		return -1;
-	}
-	freeaddrinfo( result );
-
-	return s;
-}
-
-// function used in last program
-int send_data_to_soc(int s, const char *buf, int *len) {
-    int tot = 0;
-    int bytes_left = *len;
-    int num;
-    while (tot < *len) {
-        num = send(s, buf + tot, bytes_left, 0);
-        if (num == -1)
-            break;
-        tot += num;
-        bytes_left -= num;
-    }
-    *len = tot;
-    if (num == -1) {
-        return -1;
-    } else {
-        return 0;
-    }
-}
-
-// function used in last program
-int recv_data_from_soc(int s, char *buf, int *len) {
-    int tot = 0;
-    int bytes_left = *len;
-    int num;
-    while (tot < *len) {
-        num = recv(s, buf + tot, bytes_left, 0);
-        if (num <= 0)
-            break;
-		tot += num;
-        bytes_left -= num;
-    }
-    *len = tot;
-    if (num < 0) {
-        return -1;
-    } else {
-        return 0;
-    }
-}
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ int lookup_and_connect( const char *host, const char *service ) {
+ 	struct addrinfo hints;
+ 	struct addrinfo *rp, *result;
+ 	int s;
+ 	memset( &hints, 0, sizeof( hints ) );
+ 	hints.ai_family = AF_INET;
+ 	hints.ai_socktype = SOCK_STREAM;
+ 	hints.ai_flags = 0;
+ 	hints.ai_protocol = 0;
+ 	if ( ( s = getaddrinfo( host, service, &hints, &result ) ) != 0 ) {
+ 		fprintf( stderr, "stream-talk-client: getaddrinfo: %s\n", gai_strerror( s ) );
+ 		return -1;
+ 	}
+ 	for ( rp = result; rp != NULL; rp = rp->ai_next ) {
+ 		if ( ( s = socket( rp->ai_family, rp->ai_socktype, rp->ai_protocol ) ) == -1 ) {
+ 			continue;
+ 		}
+ 		if ( connect( s, rp->ai_addr, rp->ai_addrlen ) != -1 ) {
+ 			break;
+ 		}
+ 		close( s );
+ 	}
+ 	if ( rp == NULL ) {
+ 		perror( "stream-talk-client: connect" );
+ 		return -1;
+ 	}
+ 	freeaddrinfo( result );
+ 
+ 	return s;
+ }
+ 
+ // function used in last program
+ int send_data_to_soc(int s, const char *buf, int *len) {
+     int tot = 0;
+     int bytes_left = *len;
+     int num;
+     while (tot < *len) {
+         num = send(s, buf + tot, bytes_left, 0);
+         if (num == -1)
+             break;
+         tot += num;
+         bytes_left -= num;
+     }
+     *len = tot;
+     if (num == -1) {
+         return -1;
+     } else {
+         return 0;
+     }
+ }
+ 
+ // function used in last program
+ int recv_data_from_soc(int s, char *buf, int *len) {
+     int tot = 0;
+     int bytes_left = *len;
+     int num;
+     while (tot < *len) {
+         num = recv(s, buf + tot, bytes_left, 0);
+         if (num <= 0)
+             break;
+ 		tot += num;
+         bytes_left -= num;
+     }
+     *len = tot;
+     if (num < 0) {
+         return -1;
+     } else {
+         return 0;
+     }
+ }
