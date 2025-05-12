@@ -9,9 +9,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-const unsigned char join_bytes = 0x00;
-const unsigned char pub_bytes = 0x01;
-const unsigned char search_bytes = 0x02;
+const unsigned char join = 0x00;
+const unsigned char pub = 0x01;
+const unsigned char search = 0x02;
 
 struct peer_entry {
     uint32_t id;
@@ -22,10 +22,11 @@ struct peer_entry {
     char files[10][101];
 };
 
-static struct peer_entry peers[5];
+static struct peer_entry peers[5]; //store up to 5 peers
 static int peer_cnt = 0;
 
-struct peer_entry *peer_by_socket ( int s ) {
+// Used to identify which peer sent a request.
+struct peer_entry *peer_by_socket ( int s ) { // Find peer by socket descriptor
     for ( int i=0; i<peer_cnt; i++ ) {
         if ( peers[i].sock== s ) {
             return &peers[i];
@@ -34,7 +35,7 @@ struct peer_entry *peer_by_socket ( int s ) {
     return NULL;
 }
 
-struct peer_entry *file_lookup ( const char *name ) {
+struct peer_entry *file_lookup ( const char *name ) {  // Searches for a peer that has published a file with the given name.
     for ( int i=0; i<peer_cnt; i++ ) {
         for ( int j=0; j<peers[i].file_cnt; j++ ) {
             if ( strcmp( peers[i].files[j],name ) == 0 ) {
@@ -45,7 +46,7 @@ struct peer_entry *file_lookup ( const char *name ) {
     return NULL;
 }
 
-int m_listener ( const char *port ) {
+int m_listener ( const char *port ) { // Sets up a TCP socket to listen for peer connections
     struct addrinfo hints ={ 0 }, *res;
     hints.ai_family =AF_INET;
     hints.ai_socktype =SOCK_STREAM;
@@ -56,6 +57,7 @@ int m_listener ( const char *port ) {
         exit( 1 );
     }
 
+    // Create a socket using the address info
     int s= socket( res->ai_family,res->ai_socktype,res->ai_protocol );
     if ( s<0 ) {
         perror( "socket" );
@@ -65,11 +67,12 @@ int m_listener ( const char *port ) {
     int yes= 1;
     setsockopt( s,SOL_SOCKET,SO_REUSEADDR,&yes,sizeof( yes ) );
 
+    // Bind the socket to the address and port
     if ( bind( s,res->ai_addr,res->ai_addrlen )< 0 ) {
         perror( "bind" );
         exit( 1 );
     }
-
+    // listening for incoming TCP connections on the socket
     if ( listen( s,5 )<0 ) {
         perror( "listen" );
         exit( 1 );
@@ -79,7 +82,7 @@ int m_listener ( const char *port ) {
     return s;
 }
 
-void h_join ( int sd ) {
+void h_join ( int sd ) { // this handles the join request
     unsigned char buf[4];
     if ( recv( sd,buf,4,0 ) != 4 ) {
         return;
@@ -90,13 +93,14 @@ void h_join ( int sd ) {
     uint32_t id= ntohl( net_id );
 
     if ( peer_cnt==5 ) {
-        return;
+        return; // number of peers reached (the max it can hold)
     }
 
+    // Get the IP address and port of the connected peer socket
     struct sockaddr_in addr;
     socklen_t alen= sizeof( addr );
     getpeername( sd,( struct sockaddr * ) &addr,&alen );
-
+    // Register the new peer
     struct peer_entry *p = &peers[peer_cnt++];
     p->id= id;
     p->sock= sd;
@@ -108,7 +112,7 @@ void h_join ( int sd ) {
     fflush( stdout );
 }
 
-void h_publish ( int sd ) {
+void h_publish ( int sd ) { // this handles the publish request
     unsigned char hdr[4];
     if ( recv( sd,hdr,4,0 ) != 4 ) {
         return;
@@ -118,7 +122,7 @@ void h_publish ( int sd ) {
     memcpy( &net_cnt,hdr,4 );
     uint32_t cnt = ntohl( net_cnt );
 
-    struct peer_entry *p = peer_by_socket( sd );
+    struct peer_entry *p = peer_by_socket( sd ); // Find peer with the given socket
     if ( !p ||cnt == 0|| cnt>10 ) {
         return;
     }
@@ -128,15 +132,16 @@ void h_publish ( int sd ) {
         char name[101];
         int idx= 0;
         char ch;
-        while ( idx<101 && recv( sd,&ch,1,0 )==1 ) {
+        while ( idx<101 && recv( sd,&ch,1,0 )==1 ) { // Read characters until null or max length 
             name[idx++]= ch;
             if ( ch== '\0' ) {
                 break;
             }
         }
-        if ( idx== 101 ) {
+        if ( idx== 101 ) { //if the max length was hit then it makes sure the string is null terminated 
             name[100]= '\0';
         }
+        // Store the file name
         strncpy( p->files[p->file_cnt++],name,100 );
     }
 
@@ -148,11 +153,11 @@ void h_publish ( int sd ) {
     fflush( stdout );
 }
 
-void h_search ( int sd ) {
+void h_search ( int sd ) {  // this handles the search request
     char fname[101];
     int idx= 0;
     char ch;
-    while ( idx<101 && recv( sd,&ch,1,0 )== 1 ) {
+    while ( idx<101 && recv( sd,&ch,1,0 )== 1 ) {// Read characters until null or max length 
         fname[idx++] = ch;
         if ( ch == '\0' ) {
             break;
@@ -178,13 +183,14 @@ void h_search ( int sd ) {
         memcpy( resp+4,&ip,4 );
         memcpy( resp+8,&port_n,2 );
     }
-
+    // Send the response to the requesting peer
     send( sd,resp,10,0 );
     char ipbuf[INET_ADDRSTRLEN];
     inet_ntop( AF_INET,&ip,ipbuf,sizeof( ipbuf ) );
     if ( !own ) {
         strcpy( ipbuf,"0.0.0.0" );
     }
+
     printf("TEST] SEARCH %s %u %s:%u\n",fname,id_h,ipbuf,port_h );
     fflush( stdout );
 }
@@ -202,7 +208,7 @@ int main ( int argc,char *argv[] ) {
 
     while ( true ) {
         readfds = master;
-        if ( select( fd_max+1,&readfds,NULL,NULL,NULL )<0 ) {
+        if ( select( fd_max+1,&readfds,NULL,NULL,NULL )<0 ) { //main loop using select()
             perror( "select" );
             exit( 1 );
         }
@@ -210,7 +216,7 @@ int main ( int argc,char *argv[] ) {
             if ( !FD_ISSET( sd,&readfds ) ) {
                 continue;
             }
-            if ( sd==listen_sd ) {
+            if ( sd==listen_sd ) { // New connection
                 struct sockaddr_in cli;
                 socklen_t clen= sizeof( cli );
                 int new_sd= accept( listen_sd,( struct sockaddr * ) &cli,&clen );
@@ -222,9 +228,9 @@ int main ( int argc,char *argv[] ) {
                     fd_max =new_sd;
                 }
             } else {
-                unsigned char op;
+                unsigned char op; // Existing peer sent data
                 int n = recv( sd,&op,1,0 );
-                if ( n <= 0 ) {
+                if ( n <= 0 ) { // disconnected
                     close( sd );
                     FD_CLR( sd,&master );
                     for ( int i=0; i<peer_cnt; i++ ) {
@@ -235,12 +241,12 @@ int main ( int argc,char *argv[] ) {
                     }
                     continue;
                 }
-                if ( op==join_bytes ) {
-                    h_join( sd );
-                } else if ( op==pub_bytes ) {
-                    h_publish( sd );
-                } else if ( op==search_bytes ) {
-                    h_search( sd );
+                if ( op==join ) {
+                    h_join( sd ); //handles join request
+                } else if ( op==pub ) {
+                    h_publish( sd );  //handles publish request
+                } else if ( op==search ) {
+                    h_search( sd ); //handles search request
                 } else {
                     close( sd );
                     FD_CLR( sd,&master );
